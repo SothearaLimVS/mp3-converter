@@ -31,7 +31,8 @@ def base_ydl_opts():
         "no_warnings": True,
         "noplaylist": True,
         "extractor_args": {
-            "youtube": {"player_client": ["tv", "web_safari", "ios", "android", "web"]}
+            "youtube": {"player_client": ["default", "tv", "web_safari", "mweb"]},
+            "youtubepot-bgutilscript": {"script_path": ["/app/generate_once.js"]},
         },
         "http_headers": {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
