@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#0b0b10" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MP3" />
+<link rel="manifest" href="/static/manifest.json" />
+<link rel="apple-touch-icon" href="/static/icon.svg" />
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+<title>YouTube → MP3</title>
+<style>
+:root { --bg:#0b0b10; --card:#15151d; --muted:#8a8a95; --fg:#f2f2f5; --accent:#7c5cff; --err:#ff5d6c; --ok:#3ddc97; }
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif; min-height:100%; }
+body { display:flex; align-items:center; justify-content:center; padding:24px; padding-top:max(24px,env(safe-area-inset-top)); padding-bottom:max(24px,env(safe-area-inset-bottom)); }
+.card { width:100%; max-width:520px; background:var(--card); border-radius:20px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+h1 { margin:0 0 4px; font-size:22px; letter-spacing:-.01em; }
+p.sub { margin:0 0 20px; color:var(--muted); font-size:14px; }
+input[type=url] { width:100%; padding:16px 18px; font-size:16px; border-radius:14px; border:1px solid #25252f; background:#0f0f16; color:var(--fg); outline:none; transition:border-color .15s; }
+input[type=url]:focus { border-color:var(--accent); }
+.row { display:flex; gap:10px; margin-top:14px; }
+select { flex:0 0 auto; padding:14px; border-radius:12px; background:#0f0f16; color:var(--fg); border:1px solid #25252f; font-size:15px; }
+button { flex:1; padding:16px; font-size:16px; font-weight:600; border:0; border-radius:14px; background:var(--accent); color:white; cursor:pointer; transition:transform .05s, opacity .15s; }
+button:disabled { opacity:.6; cursor:not-allowed; }
+button:active:not(:disabled) { transform:scale(.98); }
+.preview { display:none; margin-top:18px; padding:12px; background:#0f0f16; border-radius:14px; border:1px solid #25252f; gap:12px; align-items:center; }
+.preview img { width:96px; height:54px; object-fit:cover; border-radius:8px; flex:0 0 auto; }
+.preview .meta { min-width:0; }
+.preview .title { font-size:14px; font-weight:600; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.preview .uploader { font-size:12px; color:var(--muted); margin-top:2px; }
+.status { display:none; margin-top:16px; align-items:center; gap:10px; font-size:14px; color:var(--muted); }
+.spinner { width:16px; height:16px; border:2px solid #2a2a36; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.msg { display:none; margin-top:14px; padding:12px 14px; border-radius:12px; font-size:14px; }
+.msg.err { display:block; background:rgba(255,93,108,.12); color:var(--err); border:1px solid rgba(255,93,108,.3); }
+.msg.ok { display:block; background:rgba(61,220,151,.12); color:var(--ok); border:1px solid rgba(61,220,151,.3); }
+footer { text-align:center; margin-top:18px; font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>YouTube → MP3</h1>
+  <p class="sub">Paste a link. Pick a quality. Get a file.</p>
+  <input id="url" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://youtube.com/watch?v=…" />
+  <div class="preview" id="preview">
+    <img id="thumb" alt="" />
+    <div class="meta">
+      <div class="title" id="ptitle"></div>
+      <div class="uploader" id="puploader"></div>
+    </div>
+  </div>
+  <div class="row">
+    <select id="quality">
+      <option value="128">128 kbps</option>
+      <option value="192" selected>192 kbps</option>
+      <option value="320">320 kbps</option>
+    </select>
+    <button id="go">Convert</button>
+  </div>
+  <div class="status" id="status"><div class="spinner"></div><span id="statusText">Working…</span></div>
+  <div class="msg" id="msg"></div>
+  <footer>Personal use only.</footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const url = $("url"), preview = $("preview"), thumb = $("thumb"), ptitle = $("ptitle"), puploader = $("puploader");
+const go = $("go"), quality = $("quality"), status = $("status"), statusText = $("statusText"), msg = $("msg");
+let previewTimer;
+
+function showError(text) { msg.className = "msg err"; msg.textContent = text; }
+function showOk(text) { msg.className = "msg ok"; msg.textContent = text; }
+function clearMsg() { msg.className = "msg"; msg.textContent = ""; }
+function setStatus(t) { status.style.display = "flex"; statusText.textContent = t; }
+function hideStatus() { status.style.display = "none"; }
+
+async function fetchPreview() {
+  const v = url.value.trim();
+  if (!v) { preview.style.display = "none"; return; }
+  try {
+    const r = await fetch("/preview", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({url:v}) });
+    const data = await r.json();
+    if (!r.ok) { preview.style.display = "none"; return; }
+    thumb.src = data.thumbnail || "";
+    ptitle.textContent = data.title || "";
+    puploader.textContent = data.uploader || "";
+    preview.style.display = "flex";
+    clearMsg();
+  } catch { preview.style.display = "none"; }
+}
+
+url.addEventListener("input", () => {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(fetchPreview, 500);
+});
+url.addEventListener("paste", () => setTimeout(fetchPreview, 50));
+
+go.addEventListener("click", async () => {
+  const v = url.value.trim();
+  if (!v) { showError("Paste a YouTube URL first."); return; }
+  clearMsg(); go.disabled = true;
+  setStatus("Fetching video…");
+  try {
+    setTimeout(() => { if (!go.disabled === false) return; setStatus("Extracting audio…"); }, 1500);
+    setTimeout(() => { if (!go.disabled === false) return; setStatus("Encoding MP3…"); }, 4000);
+    const r = await fetch("/convert", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({url:v, quality: quality.value}) });
+    if (!r.ok) {
+      let err = "Conversion failed.";
+      try { const j = await r.json(); err = j.error || err; } catch {}
+      throw new Error(err);
+    }
+    const blob = await r.blob();
+    const cd = r.headers.get("Content-Disposition") || "";
+    const m = /filename\*?=(?:UTF-8''|")?([^";]+)/i.exec(cd);
+    const filename = m ? decodeURIComponent(m[1].replace(/"$/,"")) : "audio.mp3";
+    const dl = document.createElement("a");
+    dl.href = URL.createObjectURL(blob);
+    dl.download = filename;
+    document.body.appendChild(dl); dl.click(); dl.remove();
+    setTimeout(() => URL.revokeObjectURL(dl.href), 60000);
+    showOk("Done. Check your downloads.");
+  } catch (e) {
+    showError(e.message || "Something went wrong.");
+  } finally {
+    hideStatus(); go.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

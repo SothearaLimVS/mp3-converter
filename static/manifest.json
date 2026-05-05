@@ -1,0 +1,13 @@
+{
+  "name": "YouTube to MP3",
+  "short_name": "MP3",
+  "description": "Personal YouTube to MP3 converter.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0b10",
+  "theme_color": "#0b0b10",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
