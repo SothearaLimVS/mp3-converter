@@ -1,4 +1,4 @@
-import os, re, threading, time, uuid, tempfile
+import os, re, shutil, threading, time, uuid, tempfile
 from flask import Flask, request, jsonify, send_file, render_template, after_this_request
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -10,18 +10,25 @@ COOKIES_CANDIDATES = [
     "/etc/secrets/cookies.txt",
     os.path.join(os.path.dirname(__file__), "cookies.txt"),
 ]
+WRITABLE_COOKIES = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
 
-def cookies_path():
+def _setup_cookies():
     for p in COOKIES_CANDIDATES:
         if os.path.exists(p):
-            return p
+            try:
+                shutil.copyfile(p, WRITABLE_COOKIES)
+                os.chmod(WRITABLE_COOKIES, 0o600)
+                return WRITABLE_COOKIES
+            except OSError:
+                pass
     return None
+
+ACTIVE_COOKIES = _setup_cookies()
 
 def base_ydl_opts():
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True}
-    cf = cookies_path()
-    if cf:
-        opts["cookiefile"] = cf
+    if ACTIVE_COOKIES:
+        opts["cookiefile"] = ACTIVE_COOKIES
     return opts
 
 def safe_filename(name: str) -> str:
