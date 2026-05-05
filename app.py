@@ -46,6 +46,29 @@ def schedule_delete(path: str, delay: int = TTL_SECONDS):
 def index():
     return render_template("index.html")
 
+@app.route("/diag")
+def diag():
+    info = {"cookies_loaded": bool(ACTIVE_COOKIES), "path": ACTIVE_COOKIES}
+    if ACTIVE_COOKIES and os.path.exists(ACTIVE_COOKIES):
+        try:
+            with open(ACTIVE_COOKIES, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+            info["size_bytes"] = sum(len(l) for l in lines)
+            info["total_lines"] = len(lines)
+            info["cookie_lines"] = sum(1 for l in lines if l.strip() and not l.startswith("#"))
+            yt = [l for l in lines if "youtube.com" in l.lower()]
+            info["youtube_cookie_lines"] = len(yt)
+            names = set()
+            for l in yt:
+                parts = l.split("\t")
+                if len(parts) >= 6: names.add(parts[5])
+            info["youtube_cookie_names"] = sorted(names)
+            auth_markers = {"SID", "HSID", "SSID", "APISID", "SAPISID", "LOGIN_INFO", "__Secure-3PSID", "__Secure-1PSID"}
+            info["has_auth_cookies"] = sorted(names & auth_markers)
+        except Exception as e:
+            info["error"] = str(e)
+    return jsonify(info)
+
 @app.route("/preview", methods=["POST"])
 def preview():
     url = (request.json or {}).get("url", "").strip()
