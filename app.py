@@ -6,12 +6,22 @@ from yt_dlp.utils import DownloadError
 app = Flask(__name__)
 DOWNLOAD_DIR = tempfile.gettempdir()
 TTL_SECONDS = 300
-COOKIES_FILE = os.path.join(os.path.dirname(__file__), "cookies.txt")
+COOKIES_CANDIDATES = [
+    "/etc/secrets/cookies.txt",
+    os.path.join(os.path.dirname(__file__), "cookies.txt"),
+]
+
+def cookies_path():
+    for p in COOKIES_CANDIDATES:
+        if os.path.exists(p):
+            return p
+    return None
 
 def base_ydl_opts():
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True}
-    if os.path.exists(COOKIES_FILE):
-        opts["cookiefile"] = COOKIES_FILE
+    cf = cookies_path()
+    if cf:
+        opts["cookiefile"] = cf
     return opts
 
 def safe_filename(name: str) -> str:
@@ -93,7 +103,10 @@ def convert():
         return jsonify(error=f"Conversion error: {e}"), 500
 
 def friendly_error(msg: str) -> str:
+    print(f"[yt-dlp error] {msg}", flush=True)
     m = msg.lower()
+    if "sign in" in m or "confirm you" in m or "not a bot" in m or "bot" in m:
+        return "YouTube is blocking the server. The site owner needs to upload a cookies.txt file."
     if "age" in m and "restrict" in m: return "This video is age-restricted and can't be downloaded."
     if "private" in m: return "This video is private."
     if "not available in your country" in m or "geo" in m: return "This video is region-locked."
