@@ -26,7 +26,17 @@ def _setup_cookies():
 ACTIVE_COOKIES = _setup_cookies()
 
 def base_ydl_opts():
-    opts = {"quiet": True, "no_warnings": True, "noplaylist": True}
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "extractor_args": {
+            "youtube": {"player_client": ["tv", "web_safari", "ios", "android", "web"]}
+        },
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        },
+    }
     if ACTIVE_COOKIES:
         opts["cookiefile"] = ACTIVE_COOKIES
     return opts
